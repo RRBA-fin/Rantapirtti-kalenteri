@@ -80,6 +80,14 @@
   .st-varattu { background: var(--busy); color: var(--busy-ink); }
   .st-huolto { background: repeating-linear-gradient(135deg, var(--closed) 0 5px, transparent 5px 10px); border-color: var(--line); color: var(--muted); }
   .st-suljettu { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+  /* Sunnuntai: yläpuoli klo 14.00 asti (edellisen vuorokauden tila), alapuoli sen jälkeen. */
+  .cell.split { padding: 0; overflow: hidden; border-color: var(--line); background: transparent; color: inherit; }
+  .cell.split .dn { padding: 5px 0 2px; opacity: 1; }
+  .cell.split .dd { padding: 1px 0 4px; }
+  .bg-vapaa { background: var(--free); color: var(--ink); }
+  .bg-varattu { background: var(--busy); color: var(--busy-ink); }
+  .bg-huolto { background: repeating-linear-gradient(135deg, var(--closed) 0 5px, transparent 5px 10px); color: var(--muted); }
+  .bg-suljettu { color: var(--muted); }
   .cell.today { outline: 2px solid var(--ink); outline-offset: 1px; }
 
   .wadmin { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
@@ -171,7 +179,7 @@
 </main>
 
 <footer>
-  <p>Jokainen ruutu on yksi vuorokausi, joka alkaa kyseisenä päivänä klo 14.00. Koko viikko on ma klo 14.00 – su klo 14.00. Sunnuntain ja maanantain välinen vuorokausi on varattu huollolle.</p>
+  <p>Jokainen ruutu on yksi vuorokausi, joka alkaa kyseisenä päivänä klo 14.00. Koko viikko on ma klo 14.00 – su klo 14.00. Sunnuntaina mökki on vuokralaisen käytössä klo 14.00 asti, ja sen jälkeen alkaa huolto, joka kestää maanantaihin klo 14.00.</p>
   <p>Varauskysely ei vielä varaa aikaa. Ylläpitäjä käsittelee kyselyt saapumisjärjestyksessä ja vahvistaa varauksen erikseen.</p>
 </footer>
 
@@ -558,6 +566,14 @@ function render() {
     for (let i = 0; i < 7; i++) {
       const d = addDays(monday, i);
       const st = nightStatus(d, state.cfg, ranges);
+      // Sunnuntaina mökki on klo 14.00 asti edellisen vuorokauden käytössä, ja vasta sen jälkeen alkaa huolto.
+      const before = i === 6 ? nightStatus(addDays(d, -1), state.cfg, ranges) : st;
+      if (before !== st) {
+        cells.append(el('div', { class: 'cell split' + (d === today ? ' today' : ''),
+          title: `${DAYNAMES[i]} ${fiShort(d)}: klo 14.00 asti ${NIGHT_TEXT[before]}, sen jälkeen ${NIGHT_TEXT[st]}` },
+          el('span', { class: 'dn bg-' + before }, DAYNAMES[i]), el('span', { class: 'dd bg-' + st }, String(Number(d.slice(8))))));
+        continue;
+      }
       cells.append(el('div', { class: `cell st-${st}` + (d === today ? ' today' : ''), title: `${DAYNAMES[i]} ${fiShort(d)}: ${NIGHT_TEXT[st]}` },
         el('span', { class: 'dn' }, DAYNAMES[i]), el('span', { class: 'dd' }, String(Number(d.slice(8))))));
     }
