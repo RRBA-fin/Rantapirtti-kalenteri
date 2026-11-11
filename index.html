@@ -26,6 +26,12 @@
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   header { background: var(--brand); color: var(--brand-ink); padding: 18px 16px 14px; }
   header h1 { margin: 0; font-size: 1.3rem; letter-spacing: .01em; }
+  .hrow { max-width: 616px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .hbtns { margin-left: auto; display: flex; gap: 8px; }
+  .hbtn { background: transparent; color: var(--brand-ink); border: 1px solid rgba(255,255,255,.55); border-radius: 8px; padding: 6px 11px; font-size: .88rem; }
+  [hidden] { display: none !important; }
+  header > p { max-width: 616px; margin-left: auto; margin-right: auto; }
+  dialog h3 { margin: 14px 0 8px; font-size: .98rem; }
   header p { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
   main { max-width: 640px; margin: 0 auto; padding: 12px 12px 40px; }
   button, input, select, textarea { font: inherit; color: inherit; }
@@ -102,16 +108,21 @@
 </head>
 <body>
 <header>
-  <h1>Rantapirtin varauskalenteri</h1>
+  <div class="hrow">
+    <h1>Rantapirtin varauskalenteri</h1>
+    <div class="hbtns">
+      <button class="hbtn" id="loginLink">Ylläpitäjän kirjautuminen</button>
+      <button class="hbtn" id="settingsBtn" hidden>Asetukset</button>
+      <button class="hbtn" id="logoutBtn" hidden>Kirjaudu ulos</button>
+    </div>
+  </div>
   <p>Vuokra-aika alkaa ja päättyy aina klo 14.00.</p>
 </header>
 
 <main>
   <div class="adminbar" id="adminbar">
-    <span class="who">Hoitajan näkymä</span>
+    <span class="who">Ylläpitäjän näkymä</span>
     <label><input type="checkbox" id="showAll"> Koko vuosi</label>
-    <button class="btn small" id="settingsBtn">Asetukset</button>
-    <button class="btn small" id="logoutBtn">Kirjaudu ulos</button>
   </div>
 
   <div class="yearnav">
@@ -133,12 +144,11 @@
 
 <footer>
   <p>Jokainen ruutu on yksi vuorokausi, joka alkaa kyseisenä päivänä klo 14.00. Koko viikko on ma klo 14.00 – su klo 14.00. Sunnuntain ja maanantain välinen vuorokausi on varattu huollolle.</p>
-  <p><button class="linkbtn" id="loginLink">Hoitajan kirjautuminen</button></p>
 </footer>
 
 <dialog id="loginDlg">
   <form id="loginForm">
-    <h2>Hoitajan kirjautuminen</h2>
+    <h2>Ylläpitäjän kirjautuminen</h2>
     <label class="field"><span>Sähköposti</span><input type="email" id="loginEmail" autocomplete="username" required></label>
     <label class="field"><span>Salasana</span><input type="password" id="loginPass" autocomplete="current-password" required></label>
     <p class="error" id="loginErr"></p>
@@ -156,10 +166,10 @@
     <label class="field"><span>Puhelin</span><input type="tel" id="bPhone" maxlength="30"></label>
     <label class="field"><span>Ryhmä</span>
       <select id="bGroup">
-        <option value="aktiivi">Aktiivijäsen (15 €/vrk)</option>
-        <option value="rahasto">Rahaston henkilökunta (25 €/vrk)</option>
-        <option value="elake">Eläkejäsen (25 €/vrk)</option>
-        <option value="vapaa">Vapaajäsen (25 €/vrk)</option>
+        <option value="aktiivi">Aktiivijäsen</option>
+        <option value="rahasto">Rahaston henkilökunta</option>
+        <option value="elake">Eläkejäsen</option>
+        <option value="vapaa">Vapaajäsen</option>
       </select>
     </label>
     <div class="row2">
@@ -187,12 +197,19 @@
 
 <dialog id="settingsDlg">
   <form id="settingsForm">
-    <h2>Kauden asetukset</h2>
+    <h2>Asetukset</h2>
+    <h3>Kausi</h3>
     <p class="calc">Kausi on sama joka vuosi. Valitse päivät kuluvan vuoden kalenterista.</p>
     <div class="row2">
       <label class="field"><span>Kausi alkaa</span><input type="date" id="sStart" required></label>
       <label class="field"><span>Kausi päättyy</span><input type="date" id="sEnd" required></label>
     </div>
+    <h3>Vuokrahinnat (€/vrk)</h3>
+    <div class="row2">
+      <label class="field"><span>Aktiivijäsenet</span><input type="number" id="sRateA" min="0" step="1" inputmode="decimal" required></label>
+      <label class="field"><span>Muut ryhmät</span><input type="number" id="sRateB" min="0" step="1" inputmode="decimal" required></label>
+    </div>
+    <p class="calc">Hinnan muutos koskee uusia varauksia. Jo kirjattujen varausten hinta säilyy.</p>
     <p class="error" id="sErr"></p>
     <div class="actions">
       <button type="button" class="btn" data-close>Peruuta</button>
@@ -217,7 +234,7 @@ const firebaseConfig = {
   appId: "1:679997743305:web:ba83f97d3df1af52e7ed18"
 };
 const ADMIN_UID = "hvjKk7j5pcd3kfdSRBY5zGxPFDt2";
-const DEFAULT_CFG = { seasonStart: "05-01", seasonEnd: "09-30", extraOpen: [] };
+const DEFAULT_CFG = { seasonStart: "05-01", seasonEnd: "09-30", extraOpen: [], rateActive: 15, rateOther: 25 };
 
 // <pure>
 // Päivämäärät käsitellään merkkijonoina VVVV-KK-PP ja lasketaan UTC:ssä,
@@ -266,10 +283,12 @@ function weekSummary(monday, cfg, ranges) {
   return 'osittain';
 }
 const overlaps = (a, b) => a.start < b.end && b.start < a.end;
-function priceOf(b) {
+// Varaukseen tallennettu vuorokausihinta (b.rate) säilyy, vaikka asetusten hintoja muutetaan.
+const rateFor = (group, cfg) => group === 'aktiivi' ? cfg.rateActive : cfg.rateOther;
+function priceOf(b, cfg) {
   const nights = diffDays(b.start, b.end);
-  const rate = b.group === 'aktiivi' ? 15 : 25;
-  return { nights, price: b.type === 'normaali' ? nights * rate : 0 };
+  const rate = typeof b.rate === 'number' ? b.rate : rateFor(b.group, cfg);
+  return { nights, rate, price: b.type === 'normaali' ? nights * rate : 0 };
 }
 // </pure>
 
@@ -298,7 +317,7 @@ function defaultYear() {
 }
 
 const state = { year: defaultYear(), cfg: { ...DEFAULT_CFG }, busy: [], bookings: [], admin: false,
-  loaded: false, showAll: false, editId: null };
+  loaded: false, showAll: false, editId: null, editOrig: null };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -313,6 +332,10 @@ function render() {
   $('year').textContent = state.year;
   $('adminbar').classList.toggle('on', state.admin);
   $('loginLink').hidden = state.admin;
+  $('settingsBtn').hidden = !state.admin;
+  $('logoutBtn').hidden = !state.admin;
+  const GROUP_TEXT = { aktiivi: 'Aktiivijäsen', rahasto: 'Rahaston henkilökunta', elake: 'Eläkejäsen', vapaa: 'Vapaajäsen' };
+  for (const o of $('bGroup').options) o.textContent = `${GROUP_TEXT[o.value]} (${rateFor(o.value, state.cfg)} €/vrk)`;
   if (!state.loaded) return;
 
   const ranges = state.admin ? state.bookings : state.busy;
@@ -346,7 +369,7 @@ function render() {
     if (state.admin) {
       const bar = el('div', { class: 'wadmin' });
       for (const b of here) {
-        const p = priceOf(b);
+        const p = priceOf(b, state.cfg);
         const extra = [`${DAYNAMES[dow(b.start)].toLowerCase()} ${fiShort(b.start)} – ${DAYNAMES[dow(b.end)].toLowerCase()} ${fiShort(b.end)}`,
           `${p.nights} vrk`, TYPE_TEXT[b.type] || `${p.price} €`].join(' · ');
         bar.append(el('button', { class: 'chip', type: 'button', on: { click: () => openBooking(b) } },
@@ -407,7 +430,7 @@ $('loginForm').addEventListener('submit', async e => {
   $('loginErr').textContent = '';
   try {
     const cred = await signInWithEmailAndPassword(auth, $('loginEmail').value.trim(), $('loginPass').value);
-    if (cred.user.uid !== ADMIN_UID) { $('loginErr').textContent = 'Tällä tunnuksella ei ole hoitajan oikeuksia.'; return; }
+    if (cred.user.uid !== ADMIN_UID) { $('loginErr').textContent = 'Tällä tunnuksella ei ole ylläpitäjän oikeuksia.'; return; }
     $('loginPass').value = '';
     $('loginDlg').close();
   } catch (err) {
@@ -421,6 +444,7 @@ $('loginForm').addEventListener('submit', async e => {
 // ---------- Varauksen lisäys ja muokkaus ----------
 function openBooking(b, monday) {
   state.editId = b ? b.id : null;
+  state.editOrig = b || null;
   $('bookTitle').textContent = b ? 'Muokkaa varausta' : 'Uusi varaus';
   $('bName').value = b?.name || '';
   $('bPhone').value = b?.phone || '';
@@ -435,15 +459,18 @@ function openBooking(b, monday) {
   $('bookDlg').showModal();
 }
 function formBooking() {
-  return { name: $('bName').value.trim(), phone: $('bPhone').value.trim(), group: $('bGroup').value,
+  const group = $('bGroup').value, o = state.editOrig;
+  // Muokattaessa säilytetään varauksen alkuperäinen vuorokausihinta, ellei ryhmä vaihdu.
+  const rate = o && o.group === group && typeof o.rate === 'number' ? o.rate : rateFor(group, state.cfg);
+  return { name: $('bName').value.trim(), phone: $('bPhone').value.trim(), group, rate,
     type: $('bType').value, start: $('bStart').value, end: $('bEnd').value, note: $('bNote').value.trim() };
 }
 function updateCalc() {
   const b = formBooking(), hints = $('bHints');
   hints.replaceChildren();
   if (!b.start || !b.end || b.end <= b.start) { $('bCalc').textContent = ''; return; }
-  const p = priceOf(b);
-  $('bCalc').textContent = `${p.nights} vrk · ${b.type === 'normaali' ? p.price + ' €' : '0 € (' + TYPE_TEXT[b.type] + ')'}`;
+  const p = priceOf(b, state.cfg);
+  $('bCalc').textContent = `${p.nights} vrk · ${b.type === 'normaali' ? `${p.rate} €/vrk · ${p.price} €` : '0 € (' + TYPE_TEXT[b.type] + ')'}`;
   const notes = [];
   if (isBusy(addDays(mondayOf(b.start), 6), [b]) || mondayOf(b.start) !== mondayOf(addDays(b.end, -1)))
     notes.push('Varaus sisältää huoltovuorokauden (su–ma) tai ylittää viikkorajan.');
@@ -462,7 +489,7 @@ $('bookForm').addEventListener('submit', async e => {
   $('bSave').disabled = true;
   try {
     const ref = state.editId ? doc(db, 'bookings', state.editId) : doc(collection(db, 'bookings'));
-    const data = { ...b, updatedAt: serverTimestamp() };
+    const data = { ...b, price: priceOf(b, state.cfg).price, updatedAt: serverTimestamp() };
     if (!state.editId) data.createdAt = serverTimestamp();
     const batch = writeBatch(db);
     batch.set(ref, data, { merge: true });
@@ -493,6 +520,8 @@ $('settingsBtn').addEventListener('click', () => {
   const y = todayIso().slice(0, 4);
   $('sStart').value = `${y}-${state.cfg.seasonStart}`;
   $('sEnd').value = `${y}-${state.cfg.seasonEnd}`;
+  $('sRateA').value = state.cfg.rateActive;
+  $('sRateB').value = state.cfg.rateOther;
   $('sErr').textContent = '';
   $('settingsDlg').showModal();
 });
@@ -500,8 +529,10 @@ $('settingsForm').addEventListener('submit', async e => {
   e.preventDefault();
   const a = $('sStart').value.slice(5), b = $('sEnd').value.slice(5);
   if (!a || !b || b <= a) { $('sErr').textContent = 'Kauden pitää päättyä alkamisen jälkeen.'; return; }
+  const rateActive = Number($('sRateA').value), rateOther = Number($('sRateB').value);
+  if (!(rateActive >= 0) || !(rateOther >= 0) || $('sRateA').value === '' || $('sRateB').value === '') { $('sErr').textContent = 'Tarkista vuorokausihinnat.'; return; }
   try {
-    await setDoc(doc(db, 'config', 'public'), { seasonStart: a, seasonEnd: b }, { merge: true });
+    await setDoc(doc(db, 'config', 'public'), { seasonStart: a, seasonEnd: b, rateActive, rateOther }, { merge: true });
     $('settingsDlg').close();
   } catch (err) { $('sErr').textContent = `Tallennus epäonnistui (${err.code || 'virhe'}).`; }
 });
