@@ -100,6 +100,15 @@
   .flag.warn { border-color: var(--warn); color: var(--warn); }
   .flag.bad { border-color: var(--err); color: var(--err); font-weight: 600; }
   .ractions { display: flex; gap: 8px; }
+  dialog { max-height: 92vh; overflow-y: auto; }
+  a.btn { text-decoration: none; display: inline-block; }
+  .infobtn { display: block; width: 100%; margin: 0 0 10px; text-align: center; }
+  #infoDlg ul { margin: 6px 0 10px; padding-left: 20px; }
+  #infoDlg p { margin: 0 0 8px; }
+  .check { display: flex; gap: 9px; align-items: flex-start; margin: 4px 0 10px; font-size: .92rem; }
+  .check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  .field textarea { resize: vertical; }
+  .help { font-size: .82rem; color: var(--muted); margin: -4px 0 10px; }
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 
   footer { max-width: 640px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: .88rem; }
@@ -141,6 +150,7 @@
   </div>
 
   <div id="queue"></div>
+  <button class="btn infobtn" id="infoBtn" type="button">Kuka saa varata?</button>
 
   <div class="yearnav">
     <button class="btn" id="prevYear" aria-label="Edellinen vuosi">‹</button>
@@ -202,12 +212,18 @@
         <option value="veloitukseton">Veloitukseton käyttö</option>
       </select>
     </label>
+    <div class="row2">
+      <label class="field"><span>Vuokra (€)</span><input type="number" id="bPrice" min="0" step="0.01" inputmode="decimal"></label>
+      <label class="field"><span>Lisämaksu (€)</span><input type="number" id="bExtra" min="0" step="0.01" inputmode="decimal"></label>
+    </div>
+    <label class="field"><span>Lisämaksun selite</span><input type="text" id="bExtraLabel" maxlength="60" placeholder="esim. aurausmaksu"></label>
     <label class="field"><span>Lisätieto</span><textarea id="bNote" rows="2" maxlength="500"></textarea></label>
     <p class="calc" id="bCalc"></p>
     <div id="bHints"></div>
     <p class="error" id="bErr"></p>
     <div class="actions">
       <button type="button" class="btn danger left" id="bDelete">Poista</button>
+      <button type="button" class="btn" id="bMessage">Viesti</button>
       <button type="button" class="btn" data-close>Peruuta</button>
       <button type="submit" class="btn primary" id="bSave">Tallenna</button>
     </div>
@@ -233,6 +249,8 @@
       </select>
     </label>
     <label class="field"><span>Lisätieto (ei pakollinen)</span><textarea id="rNote" rows="2" maxlength="500"></textarea></label>
+    <label class="check"><input type="checkbox" id="rOk" required>
+      <span>Olen JHL Rautatieammattilaisten nykyinen tai entinen jäsen tai Kansan Sivistysrahaston henkilökuntaa.</span></label>
     <input class="hp" type="text" id="rWeb" tabindex="-1" autocomplete="off" aria-hidden="true">
     <p class="calc" id="rCalc"></p>
     <div id="rHints"></div>
@@ -250,6 +268,38 @@
   <div class="actions"><button type="button" class="btn primary" data-close>Selvä</button></div>
 </dialog>
 
+<dialog id="infoDlg">
+  <h2>Kuka saa varata?</h2>
+  <p>Rantapirttiä voivat vuokrata:</p>
+  <ul>
+    <li>JHL Rautatieammattilaisten nykyiset ja entiset jäsenet (aktiivi-, eläke- ja vapaajäsenet)</li>
+    <li>Kansan Sivistysrahaston henkilökunta</li>
+  </ul>
+  <p>Pelkkä eläkkeelle jääminen VR-Yhtymä Oyj:stä ei oikeuta vuokraamaan mökkiä.</p>
+  <p><strong>Varausvuorot</strong></p>
+  <ul>
+    <li>1.1. alkaen: työssäkäyvät jäsenet</li>
+    <li>1.3. alkaen: myös eläke- ja vapaajäsenet sekä rahaston henkilökunta</li>
+    <li>1.5. alkaen: vapaita aikoja voi varata lisää</li>
+  </ul>
+  <p>Ennen toukokuuta jokainen voi varata yhden jakson, enintään viikon (ma klo 14.00 – su klo 14.00). Kalenteri avautuu aina vuoden alussa kuluvalle vuodelle.</p>
+  <div class="actions"><button type="button" class="btn primary" data-close>Selvä</button></div>
+</dialog>
+
+<dialog id="smsDlg">
+  <h2>Viesti vuokralaiselle</h2>
+  <label class="field"><span>Viestipohja</span>
+    <select id="mTpl"><option value="welcome">Tervetuloviesti</option><option value="winter">Talviviesti</option></select>
+  </label>
+  <label class="field"><span>Viesti (voit muokata ennen kopiointia)</span><textarea id="mText" rows="13"></textarea></label>
+  <p class="calc" id="mInfo"></p>
+  <div class="actions">
+    <button type="button" class="btn left" data-close>Sulje</button>
+    <a class="btn" id="mSms" href="#">Avaa tekstiviestinä</a>
+    <button type="button" class="btn primary" id="mCopy">Kopioi</button>
+  </div>
+</dialog>
+
 <dialog id="settingsDlg">
   <form id="settingsForm">
     <h2>Asetukset</h2>
@@ -264,7 +314,17 @@
       <label class="field"><span>Aktiivijäsenet</span><input type="number" id="sRateA" min="0" step="1" inputmode="decimal" required></label>
       <label class="field"><span>Muut ryhmät</span><input type="number" id="sRateB" min="0" step="1" inputmode="decimal" required></label>
     </div>
-    <p class="calc">Hinnat näkyvät vain ylläpitäjälle. Muutos koskee uusia varauksia, ja jo kirjattujen varausten hinta säilyy.</p>
+    <p class="help">Hinnat näkyvät vain ylläpitäjälle. Muutos koskee uusia varauksia, ja jo kirjattujen varausten hinta säilyy.</p>
+    <h3>Maksutiedot ja avainboksi</h3>
+    <label class="field"><span>Tilinumero</span><input type="text" id="sIban" maxlength="40" autocomplete="off"></label>
+    <label class="field"><span>Avainboksin koodi</span><input type="text" id="sKey" maxlength="20" autocomplete="off"></label>
+    <h3>Ilmaisviikkoon oikeutetut</h3>
+    <label class="field"><span>Yksi nimi rivilleen</span><textarea id="sFree" rows="2"></textarea></label>
+    <p class="help">Kun oikeutettu varaa eikä ole vielä käyttänyt ilmaisviikkoaan sinä vuonna, varauslomake ehdottaa ilmaisviikkoa.</p>
+    <h3>Viestipohjat</h3>
+    <p class="help">Käytettävät kentät: {nimi} {alku} {loppu} {vrk} {hinta} {tilinumero} {koodi}. Jos varaus on maksuton, rivit joilla on {hinta} tai {tilinumero} jätetään viestistä pois.</p>
+    <label class="field"><span>Tervetuloviesti</span><textarea id="sTplW" rows="8"></textarea></label>
+    <label class="field"><span>Talviviesti</span><textarea id="sTplT" rows="8"></textarea></label>
     <p class="error" id="sErr"></p>
     <div class="actions">
       <button type="button" class="btn" data-close>Peruuta</button>
@@ -346,6 +406,22 @@ function priceOf(b, rates) {
   const rate = typeof b.rate === 'number' ? b.rate : rateFor(b.group, rates);
   return { nights, rate, price: b.type !== 'normaali' ? 0 : rate == null ? null : nights * rate };
 }
+// Varauksen loppusumma: vuokra (käsin muutettu tai laskettu) + lisämaksu. null, jos hintaa ei tiedetä.
+function totalOf(b, rates) {
+  const rent = typeof b.price === 'number' ? b.price : priceOf(b, rates).price;
+  return rent == null ? null : rent + (Number(b.extraAmount) || 0);
+}
+const fiLong = s => { const [y, m, d] = s.split('-').map(Number); return `${['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su'][dow(s)]} ${d}.${m}.${y}`; };
+const fiMoney = n => String(Math.round(n * 100) / 100).replace('.', ',');
+// Täyttää viestipohjan. Maksuttomasta varauksesta jätetään hinta- ja tilinumerorivit pois.
+function composeMessage(tpl, b, total, priv) {
+  const missing = '[puuttuu: aseta Asetuksista]';
+  const vars = { nimi: b.name || '', alku: fiLong(b.start), loppu: fiLong(b.end), vrk: String(diffDays(b.start, b.end)),
+    hinta: total == null ? '[hinta puuttuu]' : fiMoney(total), tilinumero: priv.iban || missing, koodi: priv.keyCode || missing };
+  let lines = tpl.split('\n');
+  if (total === 0) lines = lines.filter(l => !l.includes('{hinta}') && !l.includes('{tilinumero}'));
+  return lines.join('\n').replace(/\{(nimi|alku|loppu|vrk|hinta|tilinumero|koodi)\}/g, (m, k) => vars[k]);
+}
 // Varausvuorot: aktiivijäsenet tammikuun alusta, muut ryhmät maaliskuun alusta.
 const windowStart = (group, year) => group === 'aktiivi' ? `${year}-01-01` : `${year}-03-01`;
 const normName = s => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -380,6 +456,33 @@ function freeRuns(monday, cfg, ranges, today) {
 }
 // </pure>
 
+const TPL_WELCOME = `Tervetuloa Rantapirtille, {nimi}!
+
+Varauksesi: {alku} klo 14.00 – {loppu} klo 14.00 ({vrk} vrk).
+Vuokra: {hinta} €.
+Maksu tilille {tilinumero}. Kirjoita viestiksi nimesi ja vuokra-aika.
+Avainboksin koodi: {koodi}
+
+Hyvä tietää:
+- Kaivovesi ei ole juomakelpoista, joten ota juomavesi mukaan.
+- Luovuta mökki siistinä lähtöpäivänä klo 14.00 mennessä.
+
+Terveisin
+Rantapirtin varaukset`;
+const TPL_WINTER = `Tervetuloa Rantapirtille, {nimi}!
+
+Varauksesi: {alku} klo 14.00 – {loppu} klo 14.00 ({vrk} vrk).
+Vuokra: {hinta} €.
+Maksu tilille {tilinumero}. Kirjoita viestiksi nimesi ja vuokra-aika.
+Avainboksin koodi: {koodi}
+
+Talviaikana huomioitavaa:
+- Vesipumput on irrotettu talveksi, joten mökkiin ja saunalle ei tule vettä. Ota kaikki vesi mukaan.
+- Jätehuoltoa ei ole. Vie roskat mukanasi.
+- Tietä ei välttämättä ole aurattu, eikä autolla aina pääse perille. Mahdollinen auraus veloitetaan erikseen.
+
+Terveisin
+Rantapirtin varaukset`;
 const DAYNAMES = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su'];
 const STATUS_TEXT = { vapaa: 'Vapaa', varattu: 'Varattu', osittain: 'Osittain vapaa', suljettu: 'Ei varattavissa' };
 const NIGHT_TEXT = { vapaa: 'vapaa', varattu: 'varattu', huolto: 'huolto', suljettu: 'ei varattavissa' };
@@ -404,7 +507,7 @@ function defaultYear() {
   return t.slice(5) > DEFAULT_CFG.seasonEnd ? y + 1 : y;
 }
 
-const state = { year: defaultYear(), cfg: { ...DEFAULT_CFG }, busy: [], bookings: [], requests: [], rates: null, admin: false, fromRequest: null, reqRuns: [],
+const state = { year: defaultYear(), cfg: { ...DEFAULT_CFG }, busy: [], bookings: [], requests: [], rates: null, priv: {}, priceTouched: false, msgBooking: null, admin: false, fromRequest: null, reqRuns: [],
   loaded: false, showAll: false, editId: null, editOrig: null };
 
 const app = initializeApp(firebaseConfig);
@@ -421,6 +524,7 @@ function render() {
   $('adminbar').classList.toggle('on', state.admin);
   $('loginLink').hidden = state.admin;
   $('settingsBtn').hidden = !state.admin;
+  $('infoBtn').hidden = state.admin;
   $('logoutBtn').hidden = !state.admin;
   const GROUP_TEXT = { aktiivi: 'Aktiivijäsen', rahasto: 'Rahaston henkilökunta', elake: 'Eläkejäsen', vapaa: 'Vapaajäsen' };
   for (const o of $('bGroup').options) { const rt = state.admin ? rateFor(o.value, state.rates) : null; o.textContent = GROUP_TEXT[o.value] + (rt == null ? '' : ` (${rt} €/vrk)`); }
@@ -462,9 +566,10 @@ function render() {
     if (state.admin) {
       const bar = el('div', { class: 'wadmin' });
       for (const b of here) {
-        const p = priceOf(b, state.rates);
+        const total = totalOf(b, state.rates);
         const extra = [`${DAYNAMES[dow(b.start)].toLowerCase()} ${fiShort(b.start)} – ${DAYNAMES[dow(b.end)].toLowerCase()} ${fiShort(b.end)}`,
-          `${p.nights} vrk`, TYPE_TEXT[b.type] || (p.price == null ? 'hinta puuttuu' : `${p.price} €`)].join(' · ');
+          `${diffDays(b.start, b.end)} vrk`, TYPE_TEXT[b.type],
+          total == null ? 'hinta puuttuu' : (total > 0 || b.type === 'normaali') ? `${fiMoney(total)} €` : ''].filter(Boolean).join(' · ');
         bar.append(el('button', { class: 'chip', type: 'button', on: { click: () => openBooking(b) } },
           b.name || '(ei nimeä)', el('small', {}, extra)));
       }
@@ -534,6 +639,7 @@ function openRequest(monday) {
   $('rStart').value = best.start; $('rEnd').value = best.end;
   $('rWeek').textContent = `Viikko ${isoWeek(monday).week}: ${fiShort(monday)} – ${fiShort(addDays(monday, 6))}`;
   $('rErr').textContent = '';
+  $('rOk').checked = false;
   updateReqCalc();
   $('reqDlg').showModal();
 }
@@ -604,6 +710,7 @@ onAuthStateChanged(auth, user => {
     }, err => showError(`Varauksia ei voitu ladata (${err.code || 'virhe'}).`));
     unsubRates = onSnapshot(doc(db, 'config', 'private'), snap => {
       const d = snap.exists() ? snap.data() : null;
+      state.priv = d || {};
       state.rates = d && typeof d.rateActive === 'number' && typeof d.rateOther === 'number' ? d : null;
       render();
     }, err => showError(`Hintoja ei voitu ladata (${err.code || 'virhe'}). Tarkista, että uudet säännöt on julkaistu.`));
@@ -613,7 +720,7 @@ onAuthStateChanged(auth, user => {
     }, err => showError(`Kyselyjä ei voitu ladata (${err.code || 'virhe'}). Tarkista, että uudet säännöt on julkaistu.`));
   } else {
     if (user) signOut(auth);
-    state.admin = false; state.bookings = []; state.requests = []; state.rates = null;
+    state.admin = false; state.bookings = []; state.requests = []; state.rates = null; state.priv = {};
   }
   render();
 });
@@ -651,6 +758,11 @@ function openBooking(b, monday, req) {
   $('bStart').value = src?.start || monday;
   $('bEnd').value = src?.end || addDays(monday, 6);
   $('bNote').value = src?.note || '';
+  state.priceTouched = !!b?.priceManual;
+  $('bPrice').value = typeof b?.price === 'number' ? b.price : '';
+  $('bExtra').value = b?.extraAmount ? b.extraAmount : '';
+  $('bExtraLabel').value = b?.extraLabel || '';
+  $('bMessage').hidden = !b;
   $('bDelete').hidden = !b;
   $('bErr').textContent = '';
   updateCalc();
@@ -660,16 +772,33 @@ function formBooking() {
   const group = $('bGroup').value, o = state.editOrig;
   // Muokattaessa säilytetään varauksen alkuperäinen vuorokausihinta, ellei ryhmä vaihdu.
   const rate = o && o.group === group && typeof o.rate === 'number' ? o.rate : rateFor(group, state.rates);
+  const pv = $('bPrice').value;
   return { name: $('bName').value.trim(), phone: $('bPhone').value.trim(), group, rate,
-    type: $('bType').value, start: $('bStart').value, end: $('bEnd').value, note: $('bNote').value.trim() };
+    type: $('bType').value, start: $('bStart').value, end: $('bEnd').value, note: $('bNote').value.trim(),
+    price: pv === '' ? null : Number(pv), priceManual: state.priceTouched,
+    extraAmount: Number($('bExtra').value) || 0, extraLabel: $('bExtraLabel').value.trim() };
+}
+// Onko nimi ilmaisviikkoon oikeutettu, jolla on viikko vielä käyttämättä varauksen vuonna.
+function freeWeekAvailable(b) {
+  const n = normName(b.name), year = b.start.slice(0, 4);
+  if (!n || !(state.priv.freePeople || []).some(x => normName(x) === n)) return false;
+  return !state.bookings.some(o => o.id !== state.editId && o.type === 'ilmaisviikko' && o.start.slice(0, 4) === year && normName(o.name) === n);
 }
 function updateCalc() {
   const b = formBooking(), hints = $('bHints');
   hints.replaceChildren();
   if (!b.start || !b.end || b.end <= b.start) { $('bCalc').textContent = ''; return; }
-  const p = priceOf(b, state.rates);
-  $('bCalc').textContent = `${p.nights} vrk · ` + (b.type !== 'normaali' ? `0 € (${TYPE_TEXT[b.type]})`
-    : p.price == null ? 'hinta puuttuu: aseta vuokrahinnat Asetuksista' : `${p.rate} €/vrk · ${p.price} €`);
+  const p = priceOf({ ...b, price: undefined }, state.rates);
+  if (!state.priceTouched) { $('bPrice').value = p.price == null ? '' : p.price; b.price = p.price; }
+  const total = b.price == null ? null : b.price + b.extraAmount;
+  const calc = $('bCalc');
+  calc.replaceChildren(`${p.nights} vrk · ` + (state.priceTouched ? 'vuokra muutettu käsin'
+    : b.type !== 'normaali' ? TYPE_TEXT[b.type] : p.price == null ? 'hinta puuttuu: aseta vuokrahinnat Asetuksista' : `${p.rate} €/vrk`)
+    + (total == null ? '' : ` · yhteensä ${fiMoney(total)} €`));
+  if (state.priceTouched) calc.append(' ', el('button', { class: 'linkbtn', type: 'button',
+    on: { click: () => { state.priceTouched = false; updateCalc(); } } }, 'Palauta laskettu hinta'));
+  if (b.type === 'normaali' && freeWeekAvailable(b)) hints.append(el('p', { class: 'hint' }, 'Ilmaisviikko on tältä vuodelta käyttämättä. ',
+    el('button', { class: 'linkbtn', type: 'button', on: { click: () => { $('bType').value = 'ilmaisviikko'; updateCalc(); } } }, 'Merkitse ilmaisviikoksi')));
   const notes = [];
   if (isBusy(addDays(mondayOf(b.start), 6), [b]) || mondayOf(b.start) !== mondayOf(addDays(b.end, -1)))
     notes.push('Varaus sisältää huoltovuorokauden (su–ma) tai ylittää viikkorajan.');
@@ -677,6 +806,9 @@ function updateCalc() {
   for (const n of notes) hints.append(el('p', { class: 'hint' }, n));
 }
 for (const id of ['bStart', 'bEnd', 'bGroup', 'bType']) $(id).addEventListener('change', updateCalc);
+// Nimi ja lisämaksu päivittävät laskelman kirjoitettaessa (ei kentästä poistuttaessa), jotta vihjeen painike ei katoa alta.
+for (const id of ['bName', 'bExtra']) $(id).addEventListener('input', updateCalc);
+$('bPrice').addEventListener('input', () => { state.priceTouched = true; updateCalc(); });
 
 $('bookForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -685,10 +817,13 @@ $('bookForm').addEventListener('submit', async e => {
   if (!b.start || !b.end || b.end <= b.start) { $('bErr').textContent = 'Päättymispäivän pitää olla alkamispäivän jälkeen.'; return; }
   const clash = state.bookings.find(o => o.id !== state.editId && overlaps(o, b));
   if (clash) { $('bErr').textContent = `Päällekkäinen varaus: ${clash.name} (${fiShort(clash.start)} – ${fiShort(clash.end)}).`; return; }
+  if (b.price != null && !(b.price >= 0)) { $('bErr').textContent = 'Tarkista vuokran summa.'; return; }
+  if (b.rate == null) delete b.rate;
+  const wasRequest = !!state.fromRequest;
   $('bSave').disabled = true;
   try {
     const ref = state.editId ? doc(db, 'bookings', state.editId) : doc(collection(db, 'bookings'));
-    const data = { ...b, price: priceOf(b, state.rates).price, updatedAt: serverTimestamp() };
+    const data = { ...b, updatedAt: serverTimestamp() };
     if (!state.editId) data.createdAt = serverTimestamp();
     const batch = writeBatch(db);
     batch.set(ref, data, { merge: true });
@@ -696,6 +831,7 @@ $('bookForm').addEventListener('submit', async e => {
     if (state.fromRequest) batch.update(doc(db, 'requests', state.fromRequest), { status: 'hyvaksytty', bookingId: ref.id, handledAt: serverTimestamp() });
     await batch.commit();
     $('bookDlg').close();
+    if (wasRequest) openMessage({ ...b, id: ref.id });        // kyselyn hyväksynnän jälkeen suoraan viestiin
   } catch (err) {
     $('bErr').textContent = `Tallennus epäonnistui (${err.code || 'virhe'}).`;
   } finally { $('bSave').disabled = false; }
@@ -711,6 +847,37 @@ $('bDelete').addEventListener('click', async () => {
   } catch (err) { $('bErr').textContent = `Poisto epäonnistui (${err.code || 'virhe'}).`; }
 });
 
+// ---------- Viesti vuokralaiselle ----------
+function openMessage(b) {
+  state.msgBooking = b;
+  $('mTpl').value = inSeason(b.start, state.cfg) ? 'welcome' : 'winter';
+  fillMessage();
+  $('smsDlg').showModal();
+}
+function fillMessage() {
+  const b = state.msgBooking, winter = $('mTpl').value === 'winter';
+  const tpl = winter ? (state.priv.tplWinter || TPL_WINTER) : (state.priv.tplWelcome || TPL_WELCOME);
+  $('mText').value = composeMessage(tpl, b, totalOf(b, state.rates), state.priv);
+  $('mInfo').textContent = b.phone ? `Vastaanottaja: ${b.name}, ${b.phone}` : `Vastaanottaja: ${b.name} (ei puhelinnumeroa)`;
+  updateSmsLink();
+}
+function updateSmsLink() {
+  const b = state.msgBooking, num = (b.phone || '').replace(/[^\d+]/g, '');
+  $('mSms').hidden = !num;
+  $('mSms').href = `sms:${num}?body=${encodeURIComponent($('mText').value)}`;
+}
+$('mTpl').addEventListener('change', fillMessage);
+$('mText').addEventListener('input', updateSmsLink);
+$('mCopy').addEventListener('click', async () => {
+  const t = $('mText');
+  try { await navigator.clipboard.writeText(t.value); }
+  catch { t.select(); document.execCommand('copy'); }
+  $('mCopy').textContent = 'Kopioitu';
+  setTimeout(() => { $('mCopy').textContent = 'Kopioi'; }, 1800);
+});
+$('bMessage').addEventListener('click', () => { const b = state.editOrig; if (b) { $('bookDlg').close(); openMessage(b); } });
+$('infoBtn').addEventListener('click', () => $('infoDlg').showModal());
+
 // ---------- Asetukset ----------
 async function toggleExtra(monday, open) {
   try { await setDoc(doc(db, 'config', 'public'), { extraOpen: open ? arrayUnion(monday) : arrayRemove(monday) }, { merge: true }); }
@@ -722,6 +889,11 @@ $('settingsBtn').addEventListener('click', () => {
   $('sEnd').value = `${y}-${state.cfg.seasonEnd}`;
   $('sRateA').value = state.rates ? state.rates.rateActive : '';
   $('sRateB').value = state.rates ? state.rates.rateOther : '';
+  $('sIban').value = state.priv.iban || '';
+  $('sKey').value = state.priv.keyCode || '';
+  $('sFree').value = (state.priv.freePeople || []).join('\n');
+  $('sTplW').value = state.priv.tplWelcome || TPL_WELCOME;
+  $('sTplT').value = state.priv.tplWinter || TPL_WINTER;
   $('sErr').textContent = '';
   $('settingsDlg').showModal();
 });
@@ -733,7 +905,9 @@ $('settingsForm').addEventListener('submit', async e => {
   if (!(rateActive >= 0) || !(rateOther >= 0) || $('sRateA').value === '' || $('sRateB').value === '') { $('sErr').textContent = 'Tarkista vuorokausihinnat.'; return; }
   try {
     // Hinnat tallennetaan vain ylläpitäjän luettavaan asiakirjaan ja poistetaan julkisesta.
-    await setDoc(doc(db, 'config', 'private'), { rateActive, rateOther }, { merge: true });
+    await setDoc(doc(db, 'config', 'private'), { rateActive, rateOther, iban: $('sIban').value.trim(), keyCode: $('sKey').value.trim(),
+      freePeople: $('sFree').value.split('\n').map(x => x.trim()).filter(Boolean),
+      tplWelcome: $('sTplW').value.trim(), tplWinter: $('sTplT').value.trim() }, { merge: true });
     await setDoc(doc(db, 'config', 'public'), { seasonStart: a, seasonEnd: b, rateActive: deleteField(), rateOther: deleteField() }, { merge: true });
     $('settingsDlg').close();
   } catch (err) { $('sErr').textContent = `Tallennus epäonnistui (${err.code || 'virhe'}).`; }
