@@ -264,7 +264,7 @@
       <label class="field"><span>Aktiivijäsenet</span><input type="number" id="sRateA" min="0" step="1" inputmode="decimal" required></label>
       <label class="field"><span>Muut ryhmät</span><input type="number" id="sRateB" min="0" step="1" inputmode="decimal" required></label>
     </div>
-    <p class="calc">Hinnan muutos koskee uusia varauksia. Jo kirjattujen varausten hinta säilyy.</p>
+    <p class="calc">Hinnat näkyvät vain ylläpitäjälle. Muutos koskee uusia varauksia, ja jo kirjattujen varausten hinta säilyy.</p>
     <p class="error" id="sErr"></p>
     <div class="actions">
       <button type="button" class="btn" data-close>Peruuta</button>
@@ -277,7 +277,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
   from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-import { getFirestore, collection, doc, onSnapshot, writeBatch, setDoc, addDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp }
+import { getFirestore, collection, doc, onSnapshot, writeBatch, setDoc, addDoc, updateDoc, deleteField, arrayUnion, arrayRemove, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -289,7 +289,7 @@ const firebaseConfig = {
   appId: "1:679997743305:web:ba83f97d3df1af52e7ed18"
 };
 const ADMIN_UID = "hvjKk7j5pcd3kfdSRBY5zGxPFDt2";
-const DEFAULT_CFG = { seasonStart: "05-01", seasonEnd: "09-30", extraOpen: [], rateActive: 15, rateOther: 25 };
+const DEFAULT_CFG = { seasonStart: "05-01", seasonEnd: "09-30", extraOpen: [] };
 
 // <pure>
 // Päivämäärät käsitellään merkkijonoina VVVV-KK-PP ja lasketaan UTC:ssä,
@@ -339,11 +339,12 @@ function weekSummary(monday, cfg, ranges) {
 }
 const overlaps = (a, b) => a.start < b.end && b.start < a.end;
 // Varaukseen tallennettu vuorokausihinta (b.rate) säilyy, vaikka asetusten hintoja muutetaan.
-const rateFor = (group, cfg) => group === 'aktiivi' ? cfg.rateActive : cfg.rateOther;
-function priceOf(b, cfg) {
+// Hinnat ovat vain ylläpitäjän luettavissa (rates = null, jos niitä ei ole ladattu tai asetettu).
+const rateFor = (group, rates) => !rates ? null : (group === 'aktiivi' ? rates.rateActive : rates.rateOther) ?? null;
+function priceOf(b, rates) {
   const nights = diffDays(b.start, b.end);
-  const rate = typeof b.rate === 'number' ? b.rate : rateFor(b.group, cfg);
-  return { nights, rate, price: b.type === 'normaali' ? nights * rate : 0 };
+  const rate = typeof b.rate === 'number' ? b.rate : rateFor(b.group, rates);
+  return { nights, rate, price: b.type !== 'normaali' ? 0 : rate == null ? null : nights * rate };
 }
 // Varausvuorot: aktiivijäsenet tammikuun alusta, muut ryhmät maaliskuun alusta.
 const windowStart = (group, year) => group === 'aktiivi' ? `${year}-01-01` : `${year}-03-01`;
@@ -403,7 +404,7 @@ function defaultYear() {
   return t.slice(5) > DEFAULT_CFG.seasonEnd ? y + 1 : y;
 }
 
-const state = { year: defaultYear(), cfg: { ...DEFAULT_CFG }, busy: [], bookings: [], requests: [], admin: false, fromRequest: null, reqRuns: [],
+const state = { year: defaultYear(), cfg: { ...DEFAULT_CFG }, busy: [], bookings: [], requests: [], rates: null, admin: false, fromRequest: null, reqRuns: [],
   loaded: false, showAll: false, editId: null, editOrig: null };
 
 const app = initializeApp(firebaseConfig);
@@ -422,7 +423,7 @@ function render() {
   $('settingsBtn').hidden = !state.admin;
   $('logoutBtn').hidden = !state.admin;
   const GROUP_TEXT = { aktiivi: 'Aktiivijäsen', rahasto: 'Rahaston henkilökunta', elake: 'Eläkejäsen', vapaa: 'Vapaajäsen' };
-  for (const o of $('bGroup').options) o.textContent = `${GROUP_TEXT[o.value]} (${rateFor(o.value, state.cfg)} €/vrk)`;
+  for (const o of $('bGroup').options) { const rt = state.admin ? rateFor(o.value, state.rates) : null; o.textContent = GROUP_TEXT[o.value] + (rt == null ? '' : ` (${rt} €/vrk)`); }
   renderQueue();
   if (!state.loaded) return;
 
@@ -461,9 +462,9 @@ function render() {
     if (state.admin) {
       const bar = el('div', { class: 'wadmin' });
       for (const b of here) {
-        const p = priceOf(b, state.cfg);
+        const p = priceOf(b, state.rates);
         const extra = [`${DAYNAMES[dow(b.start)].toLowerCase()} ${fiShort(b.start)} – ${DAYNAMES[dow(b.end)].toLowerCase()} ${fiShort(b.end)}`,
-          `${p.nights} vrk`, TYPE_TEXT[b.type] || `${p.price} €`].join(' · ');
+          `${p.nights} vrk`, TYPE_TEXT[b.type] || (p.price == null ? 'hinta puuttuu' : `${p.price} €`)].join(' · ');
         bar.append(el('button', { class: 'chip', type: 'button', on: { click: () => openBooking(b) } },
           b.name || '(ei nimeä)', el('small', {}, extra)));
       }
@@ -545,8 +546,7 @@ function updateReqCalc() {
   const r = reqRange(), group = $('rGroup').value, hints = $('rHints');
   hints.replaceChildren();
   if (!r.ok) { $('rCalc').textContent = 'Valitse yhtenäinen vapaa jakso.'; return; }
-  const n = diffDays(r.start, r.end), rate = rateFor(group, state.cfg);
-  $('rCalc').textContent = `${n} vrk · hinta-arvio ${n * rate} € (${rate} €/vrk)`;
+  $('rCalc').textContent = `${diffDays(r.start, r.end)} vrk`;
   const ws = windowStart(group, r.start.slice(0, 4));
   if (todayIso() < ws) hints.append(el('p', { class: 'hint' }, `Ryhmäsi varausvuoro alkaa ${fiShort(ws)} Kysely jää jonoon odottamaan siihen asti.`));
 }
@@ -591,23 +591,29 @@ onSnapshot(doc(db, 'config', 'public'), snap => {
   render();
 }, () => {});
 
-let unsubBookings = null, unsubRequests = null;
+let unsubBookings = null, unsubRequests = null, unsubRates = null;
 onAuthStateChanged(auth, user => {
   if (unsubBookings) { unsubBookings(); unsubBookings = null; }
   if (unsubRequests) { unsubRequests(); unsubRequests = null; }
+  if (unsubRates) { unsubRates(); unsubRates = null; }
   if (user && user.uid === ADMIN_UID) {
     state.admin = true;
     unsubBookings = onSnapshot(collection(db, 'bookings'), snap => {
       state.bookings = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => b.start && b.end);
       render();
     }, err => showError(`Varauksia ei voitu ladata (${err.code || 'virhe'}).`));
+    unsubRates = onSnapshot(doc(db, 'config', 'private'), snap => {
+      const d = snap.exists() ? snap.data() : null;
+      state.rates = d && typeof d.rateActive === 'number' && typeof d.rateOther === 'number' ? d : null;
+      render();
+    }, err => showError(`Hintoja ei voitu ladata (${err.code || 'virhe'}). Tarkista, että uudet säännöt on julkaistu.`));
     unsubRequests = onSnapshot(collection(db, 'requests'), snap => {
       state.requests = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
       render();
     }, err => showError(`Kyselyjä ei voitu ladata (${err.code || 'virhe'}). Tarkista, että uudet säännöt on julkaistu.`));
   } else {
     if (user) signOut(auth);
-    state.admin = false; state.bookings = []; state.requests = [];
+    state.admin = false; state.bookings = []; state.requests = []; state.rates = null;
   }
   render();
 });
@@ -653,7 +659,7 @@ function openBooking(b, monday, req) {
 function formBooking() {
   const group = $('bGroup').value, o = state.editOrig;
   // Muokattaessa säilytetään varauksen alkuperäinen vuorokausihinta, ellei ryhmä vaihdu.
-  const rate = o && o.group === group && typeof o.rate === 'number' ? o.rate : rateFor(group, state.cfg);
+  const rate = o && o.group === group && typeof o.rate === 'number' ? o.rate : rateFor(group, state.rates);
   return { name: $('bName').value.trim(), phone: $('bPhone').value.trim(), group, rate,
     type: $('bType').value, start: $('bStart').value, end: $('bEnd').value, note: $('bNote').value.trim() };
 }
@@ -661,8 +667,9 @@ function updateCalc() {
   const b = formBooking(), hints = $('bHints');
   hints.replaceChildren();
   if (!b.start || !b.end || b.end <= b.start) { $('bCalc').textContent = ''; return; }
-  const p = priceOf(b, state.cfg);
-  $('bCalc').textContent = `${p.nights} vrk · ${b.type === 'normaali' ? `${p.rate} €/vrk · ${p.price} €` : '0 € (' + TYPE_TEXT[b.type] + ')'}`;
+  const p = priceOf(b, state.rates);
+  $('bCalc').textContent = `${p.nights} vrk · ` + (b.type !== 'normaali' ? `0 € (${TYPE_TEXT[b.type]})`
+    : p.price == null ? 'hinta puuttuu: aseta vuokrahinnat Asetuksista' : `${p.rate} €/vrk · ${p.price} €`);
   const notes = [];
   if (isBusy(addDays(mondayOf(b.start), 6), [b]) || mondayOf(b.start) !== mondayOf(addDays(b.end, -1)))
     notes.push('Varaus sisältää huoltovuorokauden (su–ma) tai ylittää viikkorajan.');
@@ -681,7 +688,7 @@ $('bookForm').addEventListener('submit', async e => {
   $('bSave').disabled = true;
   try {
     const ref = state.editId ? doc(db, 'bookings', state.editId) : doc(collection(db, 'bookings'));
-    const data = { ...b, price: priceOf(b, state.cfg).price, updatedAt: serverTimestamp() };
+    const data = { ...b, price: priceOf(b, state.rates).price, updatedAt: serverTimestamp() };
     if (!state.editId) data.createdAt = serverTimestamp();
     const batch = writeBatch(db);
     batch.set(ref, data, { merge: true });
@@ -713,8 +720,8 @@ $('settingsBtn').addEventListener('click', () => {
   const y = todayIso().slice(0, 4);
   $('sStart').value = `${y}-${state.cfg.seasonStart}`;
   $('sEnd').value = `${y}-${state.cfg.seasonEnd}`;
-  $('sRateA').value = state.cfg.rateActive;
-  $('sRateB').value = state.cfg.rateOther;
+  $('sRateA').value = state.rates ? state.rates.rateActive : '';
+  $('sRateB').value = state.rates ? state.rates.rateOther : '';
   $('sErr').textContent = '';
   $('settingsDlg').showModal();
 });
@@ -725,7 +732,9 @@ $('settingsForm').addEventListener('submit', async e => {
   const rateActive = Number($('sRateA').value), rateOther = Number($('sRateB').value);
   if (!(rateActive >= 0) || !(rateOther >= 0) || $('sRateA').value === '' || $('sRateB').value === '') { $('sErr').textContent = 'Tarkista vuorokausihinnat.'; return; }
   try {
-    await setDoc(doc(db, 'config', 'public'), { seasonStart: a, seasonEnd: b, rateActive, rateOther }, { merge: true });
+    // Hinnat tallennetaan vain ylläpitäjän luettavaan asiakirjaan ja poistetaan julkisesta.
+    await setDoc(doc(db, 'config', 'private'), { rateActive, rateOther }, { merge: true });
+    await setDoc(doc(db, 'config', 'public'), { seasonStart: a, seasonEnd: b, rateActive: deleteField(), rateOther: deleteField() }, { merge: true });
     $('settingsDlg').close();
   } catch (err) { $('sErr').textContent = `Tallennus epäonnistui (${err.code || 'virhe'}).`; }
 });
